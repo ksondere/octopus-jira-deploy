@@ -1,0 +1,82 @@
+{
+  "Id": "ActionTemplates-161",
+  "Name": "JIRA - Transition Issues",
+  "Description": "Transitions JIRA issues as the code they are associated with gets deployed.",
+  "ActionType": "Octopus.Script",
+  "Version": 3,
+  "CommunityActionTemplateId": null,
+  "Properties": {
+    "Octopus.Action.Script.Syntax": "PowerShell",
+    "Octopus.Action.Script.ScriptSource": "Inline",
+    "Octopus.Action.RunOnServer": "false",
+    "Octopus.Action.Script.ScriptBody": "#require version 3.0\n\nfunction Jira-QueryApi\n{\n    Param (\n        [Uri]$Query,\n        [string]$Username,\n        [string]$Password\n    );\n\n    Write-Host \"Querying JIRA API $($Query.AbsoluteUri)\"\n\n    # Prepare the Basic Authorization header - PSCredential doesn't seem to work\n    $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes((\"{0}:{1}\" -f $Username,$Password)))\n    $headers = @{Authorization=(\"Basic {0}\" -f $base64AuthInfo)}\n\n    # Execute the query\n    Invoke-RestMethod -Uri $Query -Headers $headers\n}\n\nfunction Jira-ExecuteApi\n{\n    Param (\n        [Uri]$Query,\n        [string]$Body,\n        [string]$Username,\n        [string]$Password\n    );\n\n    Write-Host \"Posting JIRA API $($Query.AbsoluteUri)\"\n\n    $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes((\"{0}:{1}\" -f $Username,$Password)))\n    $headers = @{Authorization=(\"Basic {0}\" -f $base64AuthInfo)}\n\n    $results = Invoke-RestMethod -Uri $Query -Headers $headers -UseBasicParsing -Body $Body -Method Post -ContentType \"application/json\"\n\n    $json = ConvertFrom-Json -InputObject $results\n\n    $sr.Dispose()\n\n    $json\n}\n\nfunction Jira-GetTransitions\n{\n    Param (\n        [Uri]$TransitionsUri,\n        [string]$Username,\n        [string]$Password\n    );\n\n    $transitions = Jira-QueryApi -Query $TransitionsUri -Username $Username -Password $Password\n    $transitions.transitions\n}\n\nfunction Jira-PostTransition\n{\n    Param (\n        [Uri]$TransitionsUri,\n        [string]$Username,\n        [string]$Password,\n        [string]$Body\n    );\n\n    Jira-ExecuteApi -Query $TransitionsUri -Body $body -Username $Username -Password $Password\n}\n\nfunction Jira-TransitionTicket\n{\n    Param (\n        [Uri]$IssueUri,\n        [string]$Username,\n        [string]$Password,\n        [string]$Transition\n    );\n\n    $query = $IssueUri.AbsoluteUri + \"/transitions\"\n    $uri = [System.Uri] $query\n\n    $transitions = Jira-GetTransitions -TransitionsUri $uri -Username $Username -Password $Password\n    $match = $transitions | Where name -eq $Transition | Select -First 1\n    If ($match -ne $null)\n    {\n        $transitionId = $match.id\n        $body = \"{ \"\"update\"\": { \"\"comment\"\": [ { \"\"add\"\" : { \"\"body\"\" : \"\"Status automatically updated via Octopus Deploy\"\" } } ] }, \"\"transition\"\": { \"\"id\"\": \"\"$transitionId\"\" } }\"\n\n        Jira-PostTransition -TransitionsUri $uri -Body $body -Username $Username -Password $Password\n    }\n}\n\nfunction Jira-TransitionTickets\n{\n    Param (\n        [Uri]$BaseUri,\n        [string]$Username,\n        [string]$Password,\n        [string]$Jql,\n        [string]$Transition\n    );\n\n    $api = New-Object -TypeName System.Uri -ArgumentList $BaseUri, (\"/rest/api/2/search?jql=\" + $Jql)\n    $json = Jira-QueryApi -Query $api -Username $Username -Password $Password\n\n    If ($json.total -eq 0)\n    {\n        Write-Output \"No issues were found that matched your query : $Jql\"\n    }\n    Else\n    {\n        ForEach ($issue in $json.issues)\n        {\n            Jira-TransitionTicket -IssueUri $issue.self -Transition $Transition -Username $Username -Password $Password\n        }\n    }\n}\n\n$uri = $OctopusParameters['Jira.TransitionStepTemplate.Uri']\n$jql = $OctopusParameters['Jira.TransitionStepTemplate.Query']\n$username = $OctopusParameters['Jira.TransitionStepTemplate.Username']\n$password = $OctopusParameters['Jira.TransitionStepTemplate.Password']\n$transition = $OctopusParameters['Jira.TransitionStepTemplate.Transition']\n\nJira-TransitionTickets -BaseUri $uri -Jql $jql -Transition $transition -Username $username -Password $password\n",
+    "Octopus.Action.Script.ScriptFileName": null,
+    "Octopus.Action.Package.FeedId": null,
+    "Octopus.Action.Package.PackageId": null
+  },
+  "Parameters": [
+    {
+      "Id": "58c31c3e-83df-404d-a8c9-dcea76047e4f",
+      "Name": "Jira.TransitionStepTemplate.Uri",
+      "Label": "JIRA URI",
+      "HelpText": "The URI of the JIRA Server",
+      "DefaultValue": "http://jira.aussiepay.com.au:8008",
+      "DisplaySettings": {
+        "Octopus.ControlType": "SingleLineText"
+      },
+      "Links": {}
+    },
+    {
+      "Id": "d5ada1fd-47a6-440c-bd64-c18cb9a9c1de",
+      "Name": "Jira.TransitionStepTemplate.Username",
+      "Label": "Username",
+      "HelpText": "The username of the account that will be used to run the transition. The account should have sufficient permissions in JIRA to run the transition.",
+      "DefaultValue": "octopus",
+      "DisplaySettings": {
+        "Octopus.ControlType": "SingleLineText"
+      },
+      "Links": {}
+    },
+    {
+      "Id": "9fffa3b2-3483-4cd7-beac-922cd2ea04a8",
+      "Name": "Jira.TransitionStepTemplate.Password",
+      "Label": "Password",
+      "HelpText": "The password of the account that will be used to run the transaction.",
+      "DefaultValue": {
+        "HasValue": true,
+        "NewValue": null
+      },
+      "DisplaySettings": {
+        "Octopus.ControlType": "Sensitive"
+      },
+      "Links": {}
+    },
+    {
+      "Id": "e33b11ce-873f-4846-b703-6ab8fafad1b5",
+      "Name": "Jira.TransitionStepTemplate.Transition",
+      "Label": "Transition",
+      "HelpText": "The name of the transition that should be applied to the JIRA tickets.",
+      "DefaultValue": "Deploy",
+      "DisplaySettings": {
+        "Octopus.ControlType": "SingleLineText"
+      },
+      "Links": {}
+    },
+    {
+      "Id": "46c9bed7-cfd3-488d-9f7f-2b8ac3dd2d89",
+      "Name": "Jira.TransitionStepTemplate.Query",
+      "Label": "JQL",
+      "HelpText": "The JIRA query that should be used to select issues that will be transitioned.",
+      "DefaultValue": "",
+      "DisplaySettings": {
+        "Octopus.ControlType": "SingleLineText"
+      },
+      "Links": {}
+    }
+  ],
+  "$Meta": {
+    "ExportedAt": "2017-03-07T06:01:20.631Z",
+    "OctopusVersion": "3.10.1",
+    "Type": "ActionTemplate"
+  }
+}
