@@ -20,7 +20,7 @@
       "Name": "Jira.TransitionStepTemplate.Uri",
       "Label": "JIRA URI",
       "HelpText": "The URI of the JIRA Server",
-      "DefaultValue": "http://jira.aussiepay.com.au:8008",
+      "DefaultValue": "",
       "DisplaySettings": {
         "Octopus.ControlType": "SingleLineText"
       },
@@ -31,7 +31,7 @@
       "Name": "Jira.TransitionStepTemplate.Username",
       "Label": "Username",
       "HelpText": "The username of the account that will be used to run the transition. The account should have sufficient permissions in JIRA to run the transition.",
-      "DefaultValue": "octopus",
+      "DefaultValue": "",
       "DisplaySettings": {
         "Octopus.ControlType": "SingleLineText"
       },
@@ -42,10 +42,7 @@
       "Name": "Jira.TransitionStepTemplate.Password",
       "Label": "Password",
       "HelpText": "The password of the account that will be used to run the transaction.",
-      "DefaultValue": {
-        "HasValue": true,
-        "NewValue": null
-      },
+      "DefaultValue": "",
       "DisplaySettings": {
         "Octopus.ControlType": "Sensitive"
       },
@@ -56,7 +53,7 @@
       "Name": "Jira.TransitionStepTemplate.Transition",
       "Label": "Transition",
       "HelpText": "The name of the transition that should be applied to the JIRA tickets.",
-      "DefaultValue": "Deploy",
+      "DefaultValue": "",
       "DisplaySettings": {
         "Octopus.ControlType": "SingleLineText"
       },
